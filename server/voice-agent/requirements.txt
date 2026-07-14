@@ -1,0 +1,8 @@
+livekit-agents>=1.0.0
+livekit-plugins-silero
+livekit-plugins-deepgram
+livekit-plugins-cartesia
+livekit-plugins-ai-coustics
+livekit-plugins-turn-detector
+python-dotenv
+requests

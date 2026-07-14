@@ -1,0 +1,232 @@
+// Prisma schema for AI Interview Platform (Apex.ai)
+// Requirements: 1.1, 2.3, 7.1, 10.1, 12.1, 13.3
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum Difficulty {
+  Intern
+  Fresher
+  Junior
+  Mid
+  Senior
+  Staff
+  Principal
+}
+
+enum InterviewType {
+  HR
+  Technical
+  SystemDesign
+  Behavioral
+  Coding
+  Managerial
+  Mixed
+}
+
+enum SessionStatus {
+  configured
+  active
+  completed
+  interrupted
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model User {
+  id                  String         @id @default(cuid())
+  email               String         @unique
+  passwordHash        String?
+  displayName         String
+  photoUrl            String?
+  college             String?
+  yearsOfExperience   Int            @default(0)
+  skills              String[]
+  resumeUrl           String?
+  planId              String         @default("free")
+  googleId            String?        @unique
+  notificationPrefs   Json           @default("{}")
+  themePreference     String         @default("system")
+  aiVoicePreference   String         @default("default")
+  language            String         @default("en")
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  // Relations
+  sessions            Session[]
+  refreshTokens       RefreshToken[]
+  notifications       Notification[]
+  activityLogs        ActivityLog[]
+  payments            Payment[]
+
+  @@index([email])
+}
+
+model Plan {
+  id                    String  @id
+  name                  String  @unique
+  maxInterviewsPerDay   Int
+  pdfExportEnabled      Boolean
+  shareableLinksEnabled Boolean
+}
+
+model Session {
+  id              String        @id @default(cuid())
+  userId          String
+  role            String
+  experienceYears Int
+  difficulty      Difficulty
+  interviewType   InterviewType
+  techStack       String[]
+  language        String
+  status          SessionStatus @default(configured)
+  questionCount   Int           @default(8)
+  createdAt       DateTime      @default(now())
+  completedAt     DateTime?
+  company         String?
+  personality     String?
+  currentTopic    String?
+  recruiterName   String?
+  recruiterRole   String?
+  recruiterExp    Int?
+  recruiterTeam   String?
+  currentPhase    String        @default("Introduction")
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions       Question[]
+  responses       Response[]
+  report          Report?
+
+  @@index([userId])
+}
+
+model Question {
+  id         String    @id @default(cuid())
+  sessionId  String
+  text       String
+  orderIndex Int
+  createdAt  DateTime  @default(now())
+
+  // Relations
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  response   Response?
+
+  @@index([sessionId])
+}
+
+model Response {
+  id                  String   @id @default(cuid())
+  sessionId           String
+  questionId          String   @unique
+  transcript          String
+  audioUrl            String?
+  durationSeconds     Int
+  submittedAt         DateTime @default(now())
+  technicalScore      Int
+  communicationScore  Int
+  problemSolvingScore Int
+  grammarScore        Int
+  strengths           String[]
+  improvements        String[]
+  aiNotes             String?
+
+  // Relations
+  session             Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question            Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model Report {
+  id                  String    @id @default(cuid())
+  sessionId           String    @unique
+  overallScore        Int
+  technicalScore      Int
+  communicationScore  Int
+  confidenceScore     Int
+  grammarScore        Int
+  problemSolvingScore Int
+  strengths           String[]
+  weaknesses          String[]
+  suggestions         String[]
+  shareToken          String?   @unique
+  shareTokenExpiresAt DateTime?
+  createdAt           DateTime  @default(now())
+  hiringDecision      String?
+  decisionExplanation String?
+
+  // Relations
+  session             Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([shareToken])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Payment {
+  id                String   @id @default(cuid())
+  userId            String
+  amount            Int
+  currency          String
+  provider          String
+  providerPaymentId String
+  status            String
+  createdAt         DateTime @default(now())
+
+  // Relations
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
