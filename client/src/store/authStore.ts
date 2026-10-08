@@ -12,9 +12,10 @@ interface User {
 interface AuthState {
   user: User | null;
   accessToken: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  setUser: (user: User, token: string) => void;
-  setToken: (token: string) => void;
+  setUser: (user: User, token: string, refreshToken?: string) => void;
+  setToken: (token: string, refreshToken?: string) => void;
   clearAuth: () => void;
 }
 
@@ -23,16 +24,20 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       accessToken: null,
+      refreshToken: null,
       isAuthenticated: false,
-      setUser: (user, accessToken) => set({ user, accessToken, isAuthenticated: true }),
-      setToken: (accessToken) => set({ accessToken }),
-      clearAuth: () => set({ user: null, accessToken: null, isAuthenticated: false }),
+      setUser: (user, accessToken, refreshToken) =>
+        set((s) => ({ user, accessToken, refreshToken: refreshToken ?? s.refreshToken, isAuthenticated: true })),
+      setToken: (accessToken, refreshToken) =>
+        set((s) => ({ accessToken, refreshToken: refreshToken ?? s.refreshToken })),
+      clearAuth: () => set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false }),
     }),
     {
       name: 'apex-auth',
       partialize: (s) => ({
         user: s.user,
         accessToken: s.accessToken,
+        refreshToken: s.refreshToken,
         isAuthenticated: s.isAuthenticated,
       }),
     }

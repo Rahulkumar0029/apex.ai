@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight, Loader2, Check } from 'lucide-react'
 
 import api from '@/lib/axios'
 import { cn } from '@/lib/utils'
+import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -520,6 +521,14 @@ export default function CreateInterviewPage() {
       api.post<{ sessionId: string }>('/interview/create', data).then((r) => r.data),
     onSuccess: ({ sessionId }) => {
       navigate(`/interview/${sessionId}/lobby`)
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to create interview. Please try again.';
+      toast({
+        title: 'Interview Creation Error',
+        description: msg,
+        variant: 'destructive',
+      });
     },
   })
 

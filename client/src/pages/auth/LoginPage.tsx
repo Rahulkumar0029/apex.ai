@@ -34,7 +34,7 @@ export default function LoginPage() {
   const onSubmit = async (data: FormValues) => {
     try {
       const res = await authService.login(data);
-      setUser(res.user, res.accessToken);
+      setUser(res.user, res.accessToken, res.refreshToken);
       navigate('/dashboard');
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {

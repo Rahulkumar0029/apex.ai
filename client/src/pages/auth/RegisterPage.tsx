@@ -46,7 +46,7 @@ export default function RegisterPage() {
         email: data.email,
         password: data.password,
       });
-      setUser(res.user, res.accessToken);
+      setUser(res.user, res.accessToken, res.refreshToken);
       navigate('/dashboard');
     } catch (err) {
       if (axios.isAxiosError(err)) {

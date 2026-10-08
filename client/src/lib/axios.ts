@@ -6,6 +6,7 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 export const api = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
+  timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -34,8 +35,14 @@ api.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error) => {
     const originalRequest = error.config;
+    if (!originalRequest) return Promise.reject(error);
 
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    const isAuthEndpoint =
+      originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/register') ||
+      originalRequest.url?.includes('/auth/refresh');
+
+    if (error.response?.status !== 401 || originalRequest._retry || isAuthEndpoint) {
       return Promise.reject(error);
     }
 
@@ -55,24 +62,28 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const { data } = await axios.post<{ accessToken: string }>(
+      const currentRefreshToken = useAuthStore.getState().refreshToken;
+      const { data } = await axios.post<{ accessToken: string; refreshToken?: string }>(
         `${BASE_URL}/auth/refresh`,
-        {},
-        { withCredentials: true }
+        { refreshToken: currentRefreshToken },
+        { withCredentials: true, timeout: 10000 }
       );
       const newToken = data.accessToken;
-      useAuthStore.getState().setToken(newToken);
+      useAuthStore.getState().setToken(newToken, data.refreshToken);
       processQueue(null, newToken);
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
       return api(originalRequest);
     } catch (refreshError) {
       processQueue(refreshError, null);
       useAuthStore.getState().clearAuth();
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
-    }  }
+    }
+  }
 );
 
 export default api;

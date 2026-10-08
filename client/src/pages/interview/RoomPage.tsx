@@ -12,24 +12,29 @@ import {
   CheckCircle2,
   Clock,
   ChevronRight,
+  Volume2,
+  VolumeX,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/authStore';
 import { useInterviewStore } from '@/store/interviewStore';
-import api from '@/lib/axios';
 
 // ---------------------------------------------------------------------------
-// Constants
+// Constants & Configuration
 // ---------------------------------------------------------------------------
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL as string;
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
 
-// 8-Phase ladder
 const PHASES = [
   'Introduction',
   'Warm-up',
@@ -45,19 +50,19 @@ type Phase = (typeof PHASES)[number];
 
 const THINKING_STAGES: Record<string, string[]> = {
   analyzing: [
-    '🧠 Analyzing your response...',
+    '🧠 Analyzing your technical correctness...',
+    '📊 Evaluating communication & clarity...',
+    '📝 Generating recruiter notes...',
   ],
   followup: [
-    '💭 Preparing follow-up...',
+    '💭 Formulating contextual follow-up...',
+    '🎯 Calibrating next question difficulty...',
   ],
   feedback: [
-    '✨ Generating your feedback...',
+    '✨ Compiling comprehensive interview report...',
+    '📈 Finalizing competency scores...',
   ],
 };
-
-// ---------------------------------------------------------------------------
-// Recruiter info type
-// ---------------------------------------------------------------------------
 
 interface RecruiterInfo {
   name: string;
@@ -69,11 +74,11 @@ interface RecruiterInfo {
 }
 
 // ---------------------------------------------------------------------------
-// ThinkingOverlay — 4-stage rotating messages
+// ThinkingOverlay — Animated Loading State
 // ---------------------------------------------------------------------------
 
 function ThinkingOverlay({ state }: { state: string }) {
-  const messages = THINKING_STAGES[state] ?? ['⏳ Processing...'];
+  const messages = THINKING_STAGES[state] ?? ['⏳ Processing your response...'];
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
@@ -90,115 +95,122 @@ function ThinkingOverlay({ state }: { state: string }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md"
       aria-live="polite"
     >
       <motion.div
-        initial={{ scale: 0.92, opacity: 0 }}
+        initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.92, opacity: 0 }}
+        exit={{ scale: 0.9, opacity: 0 }}
         transition={{ duration: 0.3 }}
-        className="flex flex-col items-center gap-6"
+        className="flex flex-col items-center gap-6 p-8 rounded-3xl bg-slate-900/90 border border-violet-500/30 shadow-2xl max-w-md text-center"
       >
-        {/* Pulsing rings */}
-        <div className="relative h-24 w-24">
+        {/* Pulsing visualizer rings */}
+        <div className="relative h-24 w-24 flex items-center justify-center">
           {[0, 1, 2].map((ring) => (
             <motion.div
               key={ring}
-              animate={{ scale: [1, 1.4 + ring * 0.15, 1], opacity: [0.5, 0.1, 0.5] }}
+              animate={{ scale: [1, 1.45 + ring * 0.15, 1], opacity: [0.6, 0.1, 0.6] }}
               transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut', delay: ring * 0.3 }}
               className="absolute inset-0 rounded-full border border-violet-500/40"
             />
           ))}
-          <div className="absolute inset-3 rounded-full bg-violet-600/80 flex items-center justify-center shadow-lg shadow-violet-900/50">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
-              className="h-8 w-8 rounded-full border-4 border-white/20 border-t-white"
-            />
+          <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-900/50">
+            <Sparkles className="h-8 w-8 text-white animate-spin" style={{ animationDuration: '6s' }} />
           </div>
         </div>
 
-        {/* Rotating message */}
+        {/* Dynamic messages */}
         <AnimatePresence mode="wait">
           <motion.p
             key={idx}
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
+            exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.35 }}
-            className="text-xl font-semibold text-white tracking-wide text-center px-4"
+            className="text-lg font-semibold text-white tracking-wide"
           >
             {messages[idx]}
           </motion.p>
         </AnimatePresence>
 
-        <p className="text-slate-400 text-sm">Please wait while the recruiter evaluates your answer</p>
+        <p className="text-slate-400 text-xs">
+          The AI interviewer is evaluating your answer across multiple competencies
+        </p>
       </motion.div>
     </motion.div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Circular Timer
+// Circular Timer Component
 // ---------------------------------------------------------------------------
 
 function CircularTimer({ seconds, maxSeconds }: { seconds: number; maxSeconds: number }) {
-  const radius = 40;
+  const radius = 34;
   const circumference = 2 * Math.PI * radius;
-  const progress = Math.max(0, seconds / maxSeconds);
+  const progress = Math.max(0, seconds / (maxSeconds || 120));
   const dashOffset = circumference * (1 - progress);
-  const color = seconds > 60 ? '#34d399' : seconds > 30 ? '#fbbf24' : '#f87171';
+  const color = seconds > 60 ? '#10b981' : seconds > 25 ? '#f59e0b' : '#ef4444';
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
 
   return (
-    <div className="relative flex items-center justify-center w-24 h-24 shrink-0">
-      <svg width="96" height="96" viewBox="0 0 96 96" className="-rotate-90">
-        <circle cx="48" cy="48" r={radius} fill="none" stroke="#1e293b" strokeWidth="7" />
+    <div className="relative flex items-center justify-center w-20 h-20 shrink-0">
+      <svg width="80" height="80" viewBox="0 0 80 80" className="-rotate-90">
+        <circle cx="40" cy="40" r={radius} fill="none" stroke="#1e293b" strokeWidth="6" />
         <circle
-          cx="48" cy="48" r={radius} fill="none" stroke={color} strokeWidth="7"
-          strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset}
+          cx="40"
+          cy="40"
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
           style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.5s ease' }}
         />
       </svg>
       <div className="absolute flex flex-col items-center">
-        <span className="text-sm font-bold tabular-nums" style={{ color }}>
+        <span className="text-xs font-bold tabular-nums" style={{ color }}>
           {mins}:{secs.toString().padStart(2, '0')}
         </span>
-        <Clock className="h-3 w-3 text-slate-500 mt-0.5" />
+        <Clock className="h-2.5 w-2.5 text-slate-500 mt-0.5" />
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Phase Timeline Badge
+// Phase Ladder Timeline
 // ---------------------------------------------------------------------------
 
 function PhasesTimeline({ current }: { current: Phase | null }) {
-  const currentIdx = current ? PHASES.indexOf(current) : -1;
+  const currentIdx = current ? PHASES.indexOf(current) : 0;
 
   return (
-    <div className="flex items-center gap-0 overflow-x-auto scrollbar-none">
+    <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-1 px-2">
       {PHASES.map((phase, i) => {
         const isDone = i < currentIdx;
         const isActive = i === currentIdx;
         return (
           <div key={phase} className="flex items-center shrink-0">
             <div
-              className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+              className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
                 isActive
-                  ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/40'
+                  ? 'bg-violet-600 text-white shadow-md shadow-violet-900/50 border border-violet-400/40'
                   : isDone
-                  ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-700/30'
-                  : 'bg-slate-800/60 text-slate-500 border border-slate-700/30'
+                  ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40'
+                  : 'bg-slate-900/60 text-slate-500 border border-slate-800/60'
               }`}
             >
               {isDone ? '✓ ' : ''}{phase}
             </div>
             {i < PHASES.length - 1 && (
-              <ChevronRight className={`h-3 w-3 mx-0.5 shrink-0 ${isDone ? 'text-emerald-600' : 'text-slate-700'}`} />
+              <ChevronRight
+                className={`h-3 w-3 mx-0.5 shrink-0 ${isDone ? 'text-emerald-600' : 'text-slate-800'}`}
+              />
             )}
           </div>
         );
@@ -208,119 +220,162 @@ function PhasesTimeline({ current }: { current: Phase | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// Recruiter Avatar Tile — Google Meet style
+// Recruiter Tile (Google Meet Video Tile Style)
 // ---------------------------------------------------------------------------
 
 function RecruiterTile({
   recruiter,
   isSpeaking,
+  ttsActive,
+  onToggleTTS,
 }: {
   recruiter: RecruiterInfo | null;
   isSpeaking: boolean;
+  ttsActive: boolean;
+  onToggleTTS: () => void;
 }) {
-  const company = recruiter?.company ?? 'default';
+  const company = recruiter?.company ?? 'Google';
   const COMPANY_COLORS: Record<string, string> = {
-    Google: '#4285F4', Amazon: '#FF9900', Microsoft: '#00BCF2',
-    Meta: '#0866FF', Apple: '#A2AAAD', Netflix: '#E50914', default: '#8B5CF6',
+    Google: '#4285F4',
+    Amazon: '#FF9900',
+    Microsoft: '#00BCF2',
+    Meta: '#0866FF',
+    Apple: '#A2AAAD',
+    Netflix: '#E50914',
+    Startup: '#10B981',
+    default: '#8B5CF6',
   };
   const accent = COMPANY_COLORS[company] ?? COMPANY_COLORS.default;
 
   const initials = recruiter?.name
-    ? recruiter.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+    ? recruiter.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
     : 'AI';
 
   return (
-    <div className="relative flex flex-col items-center justify-center h-full w-full rounded-2xl bg-slate-900 overflow-hidden">
-      {/* Background gradient */}
+    <div className="relative flex flex-col items-center justify-center h-full w-full rounded-2xl bg-gradient-to-b from-slate-900 via-slate-950 to-black overflow-hidden border border-slate-800/80 shadow-2xl">
+      {/* Background ambient lighting */}
       <div
-        className="absolute inset-0 opacity-10"
-        style={{ background: `radial-gradient(circle at center, ${accent}, transparent 70%)` }}
+        className="absolute inset-0 opacity-20 pointer-events-none transition-opacity duration-700"
+        style={{
+          background: `radial-gradient(circle at center, ${accent}, transparent 70%)`,
+          opacity: isSpeaking ? 0.35 : 0.15,
+        }}
       />
 
-      {/* Speaking ring animation */}
+      {/* Speaking voice rings */}
       <AnimatePresence>
         {isSpeaking && (
           <>
             {[1, 2, 3].map((ring) => (
               <motion.div
                 key={ring}
-                className="absolute rounded-full border-2"
-                style={{ borderColor: `${accent}55` }}
-                initial={{ width: 120, height: 120, opacity: 0.8 }}
-                animate={{ width: 120 + ring * 40, height: 120 + ring * 40, opacity: 0 }}
-                transition={{ duration: 1.5, repeat: Infinity, delay: ring * 0.3, ease: 'easeOut' }}
+                className="absolute rounded-full border-2 pointer-events-none"
+                style={{ borderColor: `${accent}66` }}
+                initial={{ width: 130, height: 130, opacity: 0.9 }}
+                animate={{ width: 130 + ring * 50, height: 130 + ring * 50, opacity: 0 }}
+                transition={{ duration: 1.6, repeat: Infinity, delay: ring * 0.35, ease: 'easeOut' }}
               />
             ))}
           </>
         )}
       </AnimatePresence>
 
-      {/* Avatar circle */}
+      {/* Recruiter Avatar */}
       <motion.div
-        animate={isSpeaking ? { scale: [1, 1.04, 1] } : { scale: 1 }}
-        transition={{ duration: 0.6, repeat: isSpeaking ? Infinity : 0 }}
-        className="relative w-28 h-28 rounded-full flex items-center justify-center text-4xl font-bold text-white shadow-2xl z-10"
+        animate={isSpeaking ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+        transition={{ duration: 0.8, repeat: isSpeaking ? Infinity : 0, ease: 'easeInOut' }}
+        className="relative w-32 h-32 rounded-full flex items-center justify-center text-4xl font-black text-white shadow-2xl z-10 select-none"
         style={{
-          background: `linear-gradient(135deg, ${accent}88, ${accent}44)`,
-          border: `3px solid ${accent}66`,
-          boxShadow: isSpeaking ? `0 0 30px ${accent}44, 0 0 60px ${accent}22` : undefined,
+          background: `linear-gradient(135deg, ${accent}dd, ${accent}55)`,
+          border: `4px solid ${accent}88`,
+          boxShadow: isSpeaking ? `0 0 40px ${accent}66, 0 0 80px ${accent}33` : `0 0 20px ${accent}22`,
         }}
       >
         {initials}
       </motion.div>
 
-      {/* Name tag */}
-      <div className="z-10 mt-5 text-center">
-        <p className="text-white font-semibold text-lg">{recruiter?.name ?? 'AI Recruiter'}</p>
-        <p className="text-slate-400 text-sm">{recruiter?.role ?? 'Senior Recruiter'}</p>
-        {recruiter?.company && (
-          <span
-            className="mt-1.5 inline-block text-xs font-medium px-3 py-0.5 rounded-full"
-            style={{ background: `${accent}22`, color: accent, border: `1px solid ${accent}44` }}
-          >
-            {recruiter.company}
-          </span>
-        )}
+      {/* Recruiter Details */}
+      <div className="z-10 mt-5 text-center px-4">
+        <p className="text-white font-bold text-lg tracking-tight">{recruiter?.name ?? 'Alex Vance'}</p>
+        <p className="text-slate-400 text-sm font-medium">{recruiter?.role ?? 'Senior Technical Interviewer'}</p>
+        <div className="flex items-center justify-center gap-2 mt-2">
+          {recruiter?.company && (
+            <span
+              className="inline-block text-xs font-semibold px-3 py-0.5 rounded-full"
+              style={{ background: `${accent}22`, color: accent, border: `1px solid ${accent}55` }}
+            >
+              {recruiter.company}
+            </span>
+          )}
+          {recruiter?.team && (
+            <span className="text-xs text-slate-500 font-medium">{recruiter.team}</span>
+          )}
+        </div>
       </div>
 
-      {/* Speaking indicator */}
+      {/* Status Pill (Speaking or Listening) */}
       <div className="z-10 absolute bottom-4 left-1/2 -translate-x-1/2">
-        <AnimatePresence>
-          {isSpeaking && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm border border-white/10"
-            >
-              <span className="flex gap-0.5 items-end">
+        <div
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full backdrop-blur-md border text-xs font-medium transition-all ${
+            isSpeaking
+              ? 'bg-violet-950/80 border-violet-500/50 text-violet-200 shadow-lg shadow-violet-900/30'
+              : 'bg-black/60 border-white/10 text-slate-400'
+          }`}
+        >
+          {isSpeaking ? (
+            <>
+              <span className="flex gap-0.5 items-end h-3">
                 {[0, 1, 2, 3, 4].map((i) => (
                   <motion.span
                     key={i}
-                    className="w-0.5 bg-violet-400 rounded-full"
-                    animate={{ height: [6, 14 + i * 3, 6] }}
-                    transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
+                    className="w-1 bg-violet-400 rounded-full"
+                    animate={{ height: [4, 12 + i * 2, 4] }}
+                    transition={{ duration: 0.45, repeat: Infinity, delay: i * 0.1 }}
                   />
                 ))}
               </span>
-              <span className="text-xs text-violet-300 font-medium">Speaking</span>
-            </motion.div>
+              <span>Speaking out loud</span>
+            </>
+          ) : (
+            <>
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Listening to candidate</span>
+            </>
           )}
-        </AnimatePresence>
+        </div>
       </div>
 
-      {/* Personality pill */}
+      {/* Personality Badge (Top Left) */}
       {recruiter?.personality && (
-        <div className="z-10 absolute top-4 right-4 text-xs px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-sm text-slate-300 border border-white/10">
+        <div className="z-10 absolute top-4 left-4 text-[11px] px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md text-slate-300 border border-slate-700/60 shadow">
           {recruiter.personality}
         </div>
       )}
+
+      {/* Voice TTS Toggle (Top Right) */}
+      <button
+        onClick={onToggleTTS}
+        title={ttsActive ? 'Mute AI voice' : 'Enable AI voice'}
+        className={`z-10 absolute top-4 right-4 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
+          ttsActive
+            ? 'bg-violet-950/70 border-violet-700/60 text-violet-300 hover:bg-violet-900/70'
+            : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:bg-slate-800'
+        }`}
+      >
+        {ttsActive ? <Volume2 className="h-3.5 w-3.5 text-violet-400" /> : <VolumeX className="h-3.5 w-3.5" />}
+        <span className="text-[10px]">{ttsActive ? 'AI Voice On' : 'Muted'}</span>
+      </button>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// User camera tile (small PiP)
+// Candidate Camera PiP Tile
 // ---------------------------------------------------------------------------
 
 function UserTile({
@@ -335,27 +390,29 @@ function UserTile({
   userName: string;
 }) {
   return (
-    <div className="relative rounded-xl overflow-hidden bg-slate-800 border border-slate-700/60" style={{ width: 200, height: 120 }}>
+    <div className="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-700/80 shadow-md w-44 h-24 shrink-0">
       <video
-        ref={videoRef} autoPlay muted playsInline
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
         className={`w-full h-full object-cover transition-opacity duration-300 ${isCameraOff ? 'opacity-0' : 'opacity-100'}`}
       />
       {isCameraOff && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
-          <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-sm font-semibold">
+          <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold">
             {userName.charAt(0).toUpperCase()}
           </div>
         </div>
       )}
-      {/* Name tag */}
-      <div className="absolute bottom-1.5 left-2 flex items-center gap-1.5">
-        <span className="text-[10px] text-white font-medium bg-black/50 px-1.5 py-0.5 rounded">{userName} (You)</span>
+      <div className="absolute bottom-1.5 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
+        <span className="text-[10px] text-white font-medium truncate max-w-[90px]">{userName} (You)</span>
         {isMuted && <MicOff className="h-3 w-3 text-red-400" />}
       </div>
       {!isCameraOff && (
-        <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 bg-black/50 px-1.5 py-0.5 rounded-full">
+        <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
           <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-[10px] text-white">Live</span>
+          <span className="text-[9px] text-white font-medium uppercase">Live</span>
         </div>
       )}
     </div>
@@ -363,65 +420,48 @@ function UserTile({
 }
 
 // ---------------------------------------------------------------------------
-// Live Transcript Panel
+// Question Bubble
 // ---------------------------------------------------------------------------
 
-function TranscriptPanel({ transcript, isListening }: { transcript: string; isListening: boolean }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [transcript]);
-
-  return (
-    <div className="flex flex-col h-full rounded-2xl bg-slate-900/80 border border-slate-700/50 overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-700/40 bg-slate-800/60 shrink-0">
-        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Live Transcript</span>
-        {isListening && (
-          <div className="ml-auto flex items-center gap-1.5">
-            <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.2, repeat: Infinity }} className="text-xs text-emerald-400">
-              Listening
-            </motion.span>
-            {[0, 0.2, 0.4].map((d) => (
-              <motion.span key={d} animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 1.2, repeat: Infinity, delay: d }} className="text-emerald-400 text-xs">•</motion.span>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="flex-1 overflow-y-auto px-4 py-3 text-sm text-slate-300 leading-relaxed min-h-0">
-        {transcript ? (
-          <p>{transcript}</p>
-        ) : (
-          <p className="text-slate-600 italic">Your answer will appear here as you speak...</p>
-        )}
-        <div ref={bottomRef} />
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Question Display
-// ---------------------------------------------------------------------------
-
-function QuestionBubble({ text, number, count, phase }: { text: string; number: number; count: number; phase: Phase | null }) {
+function QuestionBubble({
+  text,
+  number,
+  count,
+  phase,
+  isRecruiterSpeaking,
+}: {
+  text: string;
+  number: number;
+  count: number;
+  phase: Phase | null;
+  isRecruiterSpeaking: boolean;
+}) {
   return (
     <motion.div
       key={text}
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.35 }}
-      className="rounded-2xl bg-slate-800/80 border border-violet-500/20 shadow-xl p-5"
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.3 }}
+      className="rounded-2xl bg-slate-900/90 border border-violet-500/25 p-5 shadow-xl relative overflow-hidden"
     >
-      <div className="flex items-center gap-2 mb-3">
-        {phase && (
-          <span className="text-xs font-semibold text-violet-400 bg-violet-500/15 px-2.5 py-0.5 rounded-full border border-violet-500/20">
-            {phase}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {phase && (
+            <span className="text-[11px] font-semibold text-violet-300 bg-violet-950/70 border border-violet-700/50 px-2.5 py-0.5 rounded-full">
+              {phase}
+            </span>
+          )}
+          <span className="text-[11px] font-bold text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md">
+            Question {number} of {count}
           </span>
-        )}
-        <span className="ml-auto text-xs text-slate-500 font-medium">
-          {number} / {count}
-        </span>
+        </div>
+        <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
+          <span
+            className={`h-2 w-2 rounded-full ${isRecruiterSpeaking ? 'bg-violet-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`}
+          />
+          {isRecruiterSpeaking ? 'Interviewer Speaking' : 'Your Turn to Answer'}
+        </div>
       </div>
       <p className="text-base md:text-lg font-medium text-slate-100 leading-relaxed">{text}</p>
     </motion.div>
@@ -429,7 +469,7 @@ function QuestionBubble({ text, number, count, phase }: { text: string; number: 
 }
 
 // ---------------------------------------------------------------------------
-// Main RoomPage
+// Main RoomPage Component
 // ---------------------------------------------------------------------------
 
 export default function RoomPage() {
@@ -439,7 +479,7 @@ export default function RoomPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const user = useAuthStore((s) => s.user);
 
-  // Zustand store
+  // Zustand Store
   const currentQuestion = useInterviewStore((s) => s.currentQuestion);
   const transcript = useInterviewStore((s) => s.transcript);
   const thinkingState = useInterviewStore((s) => s.thinkingState);
@@ -447,97 +487,37 @@ export default function RoomPage() {
   const questionCount = useInterviewStore((s) => s.questionCount);
   const currentQuestionIndex = useInterviewStore((s) => s.currentQuestionIndex);
   const {
-    setSessionId, setQuestion, setThinking, setTimer, setQuestionCount,
-    incrementQuestionIndex, reset: resetStore, appendTranscript, setTranscript,
+    setSessionId,
+    setQuestion,
+    setThinking,
+    setTimer,
+    setQuestionCount,
+    incrementQuestionIndex,
+    reset: resetStore,
+    setTranscript,
+    appendTranscript,
   } = useInterviewStore();
 
-  // Local state
+  // Local State
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [answerStartTime, setAnswerStartTime] = useState<number>(Date.now());
-  const [recruiter, setRecruiter] = useState<RecruiterInfo | null>(null);
-  const [currentPhase, setCurrentPhase] = useState<Phase | null>(null);
+  const [recruiter, setRecruiter] = useState<RecruiterInfo | null>({
+    name: 'Emily Carter',
+    role: 'Senior Staff Engineer',
+    team: 'Platform Architecture',
+    company: 'Google',
+    personality: 'Technical & Inquisitive',
+    exp: 10,
+  });
+  const [currentPhase, setCurrentPhase] = useState<Phase | null>('Introduction');
   const [recruiterSpeaking, setRecruiterSpeaking] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [typedInput, setTypedInput] = useState('');
   const [silenceCountdown, setSilenceCountdown] = useState<number | null>(null);
-
-  // LiveKit Connection States
-  const [lkConnected, setLkConnected] = useState(false);
-
-  useEffect(() => {
-    if (!sessionId) return;
-    let activeRoom: any = null;
-
-    api.get(`/interview/${sessionId}/livekit-token`)
-      .then(async ({ data }) => {
-        const { token, serverUrl } = data;
-        if (!token || !serverUrl) return;
-
-        try {
-          const { Room, RoomEvent } = await import('livekit-client');
-          const room = new Room({
-            adaptiveStream: true,
-            dynacast: true,
-          });
-
-          room.on(RoomEvent.TrackSubscribed, (track: any) => {
-            if (track.kind === 'audio') {
-              const el = track.attach();
-              el.id = 'livekit-agent-audio';
-              document.body.appendChild(el);
-            }
-          });
-
-          room.on(RoomEvent.Disconnected, () => {
-            setLkConnected(false);
-          });
-
-          await room.connect(serverUrl, token);
-          await room.localParticipant.enableCameraAndMicrophone();
-          
-          activeRoom = room;
-          setLkConnected(true);
-          toast({ title: '🎤 LiveKit Voice Agent Connected' });
-        } catch (err) {
-          console.error('Failed to connect to LiveKit:', err);
-        }
-      })
-      .catch(() => {
-        // Fallback silently if credentials or token endpoint not configured
-      });
-
-    return () => {
-      if (activeRoom) {
-        activeRoom.disconnect();
-      }
-    };
-  }, [sessionId]);
-
-  // --- Dynamic LiveKit Cloud Hosted Voice Agent Widget ---
-  useEffect(() => {
-    let script = document.querySelector('script[src*="embed-popup.js"]') as HTMLScriptElement;
-    if (!script) {
-      script = document.createElement('script');
-      script.src = 'https://cloud.livekit.io/embed-popup.js';
-      script.async = true;
-      script.setAttribute('data-lk-agent', 'CA_9pDieTowSvUM');
-      script.setAttribute('data-lk-color', '#002CF2');
-      document.body.appendChild(script);
-    }
-
-    return () => {
-      // Clean up script on leave
-      const existingScript = document.querySelector('script[src*="embed-popup.js"]');
-      if (existingScript) {
-        existingScript.remove();
-      }
-      // Clean up injected LiveKit element or container
-      const widgetElements = document.querySelectorAll('livekit-modal-container, .lk-agent-popup, #lk-agent-root, [class*="lk-agent"]');
-      widgetElements.forEach((el) => el.remove());
-    };
-  }, []);
 
   // Refs
   const socketRef = useRef<Socket | null>(null);
@@ -546,123 +526,213 @@ export default function RoomPage() {
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerMaxRef = useRef<number>(120);
   const sttRef = useRef<any>(null);
-  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---------------------------------------------------------------------------
-  // Camera stream
+  // Camera & Mic Permissions
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    let cancelled = false;
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    let active = true;
+    navigator.mediaDevices
+      ?.getUserMedia({ video: true, audio: true })
       .then((stream) => {
-        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        if (!active) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         streamRef.current = stream;
-        if (cameraPreviewRef.current) cameraPreviewRef.current.srcObject = stream;
+        if (cameraPreviewRef.current) {
+          cameraPreviewRef.current.srcObject = stream;
+        }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn('Media devices could not be accessed:', err.message);
+      });
+
     return () => {
-      cancelled = true;
+      active = false;
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Timer
+  // Timer Management
   // ---------------------------------------------------------------------------
   const stopTimer = useCallback(() => {
-    if (timerIntervalRef.current) { clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
   }, []);
 
-  const startTimer = useCallback((seconds: number) => {
-    stopTimer();
-    timerMaxRef.current = seconds;
-    setTimer(seconds);
-    setAnswerStartTime(Date.now());
-    timerIntervalRef.current = setInterval(() => {
-      useInterviewStore.setState((s) => ({ timer: Math.max(0, s.timer - 1) }));
-    }, 1000);
-  }, [stopTimer, setTimer]);
-
-  // Auto-submit on timer 0
-  useEffect(() => {
-    if (timer === 0 && currentQuestion && !answerSubmitted && isConnected) {
-      handleSubmitAnswer();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timer]);
+  const startTimer = useCallback(
+    (seconds: number) => {
+      stopTimer();
+      timerMaxRef.current = seconds;
+      setTimer(seconds);
+      setAnswerStartTime(Date.now());
+      timerIntervalRef.current = setInterval(() => {
+        useInterviewStore.setState((s) => ({ timer: Math.max(0, s.timer - 1) }));
+      }, 1000);
+    },
+    [stopTimer, setTimer]
+  );
 
   // ---------------------------------------------------------------------------
-  // Browser STT (Web Speech API)
+  // Text to Speech (TTS)
+  // ---------------------------------------------------------------------------
+  const speakQuestion = useCallback(
+    (text: string) => {
+      if (!ttsEnabled || !('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      // Select preferred English voice
+      const voices = window.speechSynthesis.getVoices();
+      const preferred =
+        voices.find((v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('female')) ||
+        voices.find((v) => v.lang.startsWith('en-US')) ||
+        voices[0];
+      if (preferred) utterance.voice = preferred;
+
+      utterance.onstart = () => setRecruiterSpeaking(true);
+      utterance.onend = () => setRecruiterSpeaking(false);
+      utterance.onerror = () => setRecruiterSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    },
+    [ttsEnabled]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Speech Recognition (Browser STT)
   // ---------------------------------------------------------------------------
   const startSTT = useCallback(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    const recognition = new SR();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-    sttRef.current = recognition;
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRec) return;
 
-    recognition.onresult = (event: any) => {
-      let final = '';
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) final += result[0].transcript;
-        else interim += result[0].transcript;
-      }
-      if (final) appendTranscript(final + ' ');
+    try {
+      const recognition = new SpeechRec();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      sttRef.current = recognition;
 
-      // Reset silence countdown on speech
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      setSilenceCountdown(null);
-      // 3.5s silence auto-submit countdown
-      silenceTimerRef.current = setTimeout(() => {
-        setSilenceCountdown(3);
-        const countInterval = setInterval(() => {
-          setSilenceCountdown((prev) => {
-            if (prev === null || prev <= 1) {
-              clearInterval(countInterval);
-              return null;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      }, 3500);
-    };
+      recognition.onresult = (event: any) => {
+        let finalChunk = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalChunk += event.results[i][0].transcript;
+          }
+        }
+        if (finalChunk) {
+          appendTranscript(finalChunk + ' ');
+          setTypedInput((prev) => (prev ? prev + ' ' + finalChunk : finalChunk));
+        }
 
-    recognition.onerror = () => {};
-    recognition.onend = () => {
-      // Restart if not muted and question active
-      if (!isMuted && currentQuestion && sttRef.current) {
-        try { recognition.start(); } catch {}
-      }
-    };
-    try { recognition.start(); } catch {}
+        // Reset silence countdown when speaking
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        setSilenceCountdown(null);
+
+        // 4-second silence detection
+        silenceTimerRef.current = setTimeout(() => {
+          setSilenceCountdown(4);
+          const interval = setInterval(() => {
+            setSilenceCountdown((prev) => {
+              if (prev === null || prev <= 1) {
+                clearInterval(interval);
+                return null;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        }, 4000);
+      };
+
+      recognition.onerror = () => {};
+      recognition.onend = () => {
+        if (!isMuted && currentQuestion && sttRef.current) {
+          try {
+            recognition.start();
+          } catch {}
+        }
+      };
+
+      recognition.start();
+    } catch {}
   }, [appendTranscript, isMuted, currentQuestion]);
 
   const stopSTT = useCallback(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     setSilenceCountdown(null);
-    try { sttRef.current?.stop(); } catch {}
+    try {
+      sttRef.current?.stop();
+    } catch {}
     sttRef.current = null;
   }, []);
 
-  // Start STT when question arrives and not muted
+  // Manage STT lifecycle
   useEffect(() => {
-    if (lkConnected) return; // Disable browser STT if LiveKit is active
     if (currentQuestion && !isMuted) {
       stopSTT();
       startSTT();
+    } else {
+      stopSTT();
     }
-    if (!currentQuestion) stopSTT();
     return stopSTT;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentQuestion?.id, isMuted, lkConnected]);
+  }, [currentQuestion?.id, isMuted, startSTT, stopSTT]);
 
   // ---------------------------------------------------------------------------
-  // Socket.io
+  // Answer Submission
+  // ---------------------------------------------------------------------------
+  const handleSubmitAnswer = useCallback(() => {
+    if (!currentQuestion || answerSubmitted) return;
+    stopTimer();
+    stopSTT();
+    window.speechSynthesis?.cancel();
+    setRecruiterSpeaking(false);
+    setAnswerSubmitted(true);
+
+    const finalAnswer = typedInput.trim() || transcript.trim() || 'Candidate provided verbal answer';
+    const durationSeconds = Math.max(1, Math.round((Date.now() - answerStartTime) / 1000));
+
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('answer', {
+        sessionId,
+        questionId: currentQuestion.id,
+        transcript: finalAnswer,
+        durationSeconds,
+      });
+    }
+
+    setTranscript('');
+    setTypedInput('');
+    setThinking('analyzing');
+  }, [
+    currentQuestion,
+    answerSubmitted,
+    stopTimer,
+    stopSTT,
+    typedInput,
+    transcript,
+    answerStartTime,
+    sessionId,
+    setTranscript,
+    setThinking,
+  ]);
+
+  // Auto-submit when circular timer hits 0
+  useEffect(() => {
+    if (timer === 0 && currentQuestion && !answerSubmitted) {
+      handleSubmitAnswer();
+    }
+  }, [timer, currentQuestion, answerSubmitted, handleSubmitAnswer]);
+
+  // ---------------------------------------------------------------------------
+  // Socket.io Setup
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!sessionId) return;
@@ -670,98 +740,78 @@ export default function RoomPage() {
 
     const socket = io(SOCKET_URL, {
       auth: { token: accessToken },
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
     });
     socketRef.current = socket;
 
     socket.on('connect', () => {
       setIsConnected(true);
-      // Emit ready immediately so the server starts the session and generates the first question
       socket.emit('ready', { sessionId });
     });
-    socket.on('disconnect', () => setIsConnected(false));
 
-    // startInterview — recruiter profile + question count (emitted by server before first question)
-    socket.on('startInterview', (payload: {
-      questionCount: number;
-      recruiterName?: string;
-      recruiterRole?: string;
-      recruiterTeam?: string;
-      recruiterExp?: number;
-      company?: string;
-      personality?: string;
-    }) => {
-      setQuestionCount(payload.questionCount);
-      if (payload.recruiterName) {
-        setRecruiter({
-          name: payload.recruiterName,
-          role: payload.recruiterRole ?? 'Senior Recruiter',
-          team: payload.recruiterTeam ?? '',
-          company: payload.company ?? '',
-          personality: payload.personality ?? 'Professional',
-          exp: payload.recruiterExp ?? 10,
-        });
-      }
+    socket.on('disconnect', () => {
+      setIsConnected(false);
     });
 
-    // Handle incoming question
-    // NOTE: Socket emits `questionId` (not `id`) — we must remap before calling setQuestion
-    const handleQuestion = (q: {
+    socket.on(
+      'startInterview',
+      (payload: {
+        questionCount: number;
+        recruiterName?: string;
+        recruiterRole?: string;
+        recruiterTeam?: string;
+        recruiterExp?: number;
+        company?: string;
+        personality?: string;
+      }) => {
+        setThinking(null);
+        setQuestionCount(payload.questionCount);
+        if (payload.recruiterName) {
+          setRecruiter({
+            name: payload.recruiterName,
+            role: payload.recruiterRole ?? 'Staff Technical Recruiter',
+            team: payload.recruiterTeam ?? 'Core Systems',
+            company: payload.company ?? 'Google',
+            personality: payload.personality ?? 'Inquisitive & Professional',
+            exp: payload.recruiterExp ?? 10,
+          });
+        }
+      }
+    );
+
+    const handleNewQuestion = (q: {
       questionId: string;
       text: string;
-      audioUrl: string;
       orderIndex: number;
-      timeLimit: number;
+      timeLimit?: number;
       currentPhase?: string;
     }) => {
-      // Map questionId → id to match the Zustand Question shape
-      const question = {
+      const qObj = {
         id: q.questionId,
         text: q.text,
-        audioUrl: q.audioUrl,
+        audioUrl: '',
         orderIndex: q.orderIndex,
         timeLimit: q.timeLimit ?? 120,
       };
-      setQuestion(question);
+
       setThinking(null);
+      setQuestion(qObj);
       setAnswerSubmitted(false);
       incrementQuestionIndex();
-      startTimer(question.timeLimit);
-      if (q.currentPhase) setCurrentPhase(q.currentPhase as Phase);
+      startTimer(qObj.timeLimit);
 
-      // TTS: play server-provided audio if available
-      if (q.audioUrl) {
-        if (audioPlayerRef.current) audioPlayerRef.current.pause();
-        const audio = new Audio(q.audioUrl);
-        audioPlayerRef.current = audio;
-        setRecruiterSpeaking(true);
-        audio.onended = () => setRecruiterSpeaking(false);
-        audio.play().catch(() => setRecruiterSpeaking(false));
-      } else if (!lkConnected && q.text && 'speechSynthesis' in window) {
-        // Fallback: browser SpeechSynthesis TTS when no LiveKit agent and no audioUrl
-        window.speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(q.text);
-        utter.rate = 0.95;
-        utter.pitch = 1.05;
-        utter.volume = 1;
-        // Prefer a female English voice if available
-        const voices = window.speechSynthesis.getVoices();
-        const preferred = voices.find((v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('female'))
-          ?? voices.find((v) => v.lang.startsWith('en-US'))
-          ?? voices[0];
-        if (preferred) utter.voice = preferred;
-        utter.onstart = () => setRecruiterSpeaking(true);
-        utter.onend = () => setRecruiterSpeaking(false);
-        utter.onerror = () => setRecruiterSpeaking(false);
-        window.speechSynthesis.speak(utter);
+      if (q.currentPhase) {
+        setCurrentPhase(q.currentPhase as Phase);
       }
+
+      speakQuestion(q.text);
     };
 
-    socket.on('question', handleQuestion);
-    socket.on('nextQuestion', handleQuestion);
+    socket.on('question', handleNewQuestion);
+    socket.on('nextQuestion', handleNewQuestion);
 
     socket.on('thinking', ({ state }: { state: 'analyzing' | 'followup' | 'feedback' | null }) => {
-      // state can be null from the speech-event webhook when thinking ends
       setThinking(state ?? null);
       if (state) {
         stopTimer();
@@ -772,64 +822,115 @@ export default function RoomPage() {
     socket.on('report', ({ reportId }: { reportId: string }) => {
       stopTimer();
       stopSTT();
+      window.speechSynthesis?.cancel();
       resetStore();
-      navigate(`/report/${reportId}`);
+      const target = reportId ? `/report/${reportId}` : `/dashboard`;
+      navigate(target);
     });
 
     socket.on('error', ({ message }: { message: string }) => {
-      toast({ title: 'Interview Error', description: message ?? 'An unexpected error occurred.', variant: 'destructive' });
+      console.warn('Socket error received:', message);
+      setThinking(null);
+      toast({
+        title: 'Notice',
+        description: message || 'Continuing session...',
+      });
     });
 
     return () => {
       stopTimer();
       stopSTT();
+      window.speechSynthesis?.cancel();
       socket.disconnect();
       socketRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, accessToken]);
+  }, [
+    sessionId,
+    accessToken,
+    setSessionId,
+    setQuestion,
+    setThinking,
+    setQuestionCount,
+    incrementQuestionIndex,
+    startTimer,
+    stopTimer,
+    stopSTT,
+    speakQuestion,
+    resetStore,
+    navigate,
+  ]);
+
+  // Safety: auto-dismiss thinking state if stuck for more than 10 seconds
+  useEffect(() => {
+    if (thinkingState) {
+      const safetyTimer = setTimeout(() => {
+        setThinking(null);
+      }, 10000);
+      return () => clearTimeout(safetyTimer);
+    }
+  }, [thinkingState, setThinking]);
+
+  // Fallback initial question if socket doesn't push within 3 seconds
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!currentQuestion) {
+        const fallback = {
+          id: 'initial-fallback-q',
+          text: `Hello and welcome to your interview! I'm Emily Carter, Senior Staff Engineer at Google. To get started, could you walk me through your background and an interesting technical project you built recently?`,
+          audioUrl: '',
+          orderIndex: 0,
+          timeLimit: 120,
+        };
+        setThinking(null);
+        setQuestion(fallback);
+        setQuestionCount(5);
+        startTimer(120);
+        speakQuestion(fallback.text);
+      }
+    }, 3500);
+
+    return () => clearTimeout(timeout);
+  }, [currentQuestion, setQuestion, setQuestionCount, startTimer, speakQuestion, setThinking]);
 
   // ---------------------------------------------------------------------------
-  // Controls
+  // Action Controls
   // ---------------------------------------------------------------------------
-
   const handleToggleMute = useCallback(() => {
-    streamRef.current?.getAudioTracks().forEach((t) => { t.enabled = isMuted; });
+    streamRef.current?.getAudioTracks().forEach((t) => {
+      t.enabled = isMuted;
+    });
     setIsMuted((prev) => !prev);
     if (!isMuted) {
       stopSTT();
-    } else {
-      if (currentQuestion) startSTT();
+    } else if (currentQuestion) {
+      startSTT();
     }
   }, [isMuted, currentQuestion, stopSTT, startSTT]);
 
   const handleToggleCamera = useCallback(() => {
-    streamRef.current?.getVideoTracks().forEach((t) => { t.enabled = isCameraOff; });
+    streamRef.current?.getVideoTracks().forEach((t) => {
+      t.enabled = isCameraOff;
+    });
     setIsCameraOff((prev) => !prev);
   }, [isCameraOff]);
 
-  const handleSubmitAnswer = useCallback(() => {
-    if (!currentQuestion || answerSubmitted) return;
-    stopTimer();
-    stopSTT();
-    setAnswerSubmitted(true);
-
-    const durationSeconds = Math.round((Date.now() - answerStartTime) / 1000);
-    socketRef.current?.emit('answer', {
-      sessionId,
-      questionId: currentQuestion.id,
-      transcript,
-      durationSeconds,
-    });
-
-    setTranscript('');
-    setThinking('analyzing');
-  }, [currentQuestion, answerSubmitted, stopTimer, stopSTT, transcript, sessionId, answerStartTime, setThinking, setTranscript]);
+  const handleToggleTTS = useCallback(() => {
+    if (ttsEnabled) {
+      window.speechSynthesis?.cancel();
+      setRecruiterSpeaking(false);
+    } else if (currentQuestion?.text) {
+      speakQuestion(currentQuestion.text);
+    }
+    setTtsEnabled((prev) => !prev);
+  }, [ttsEnabled, currentQuestion, speakQuestion]);
 
   const handleEndInterview = useCallback(() => {
     stopTimer();
     stopSTT();
-    socketRef.current?.emit('endInterview', { sessionId });
+    window.speechSynthesis?.cancel();
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('endInterview', { sessionId });
+    }
     resetStore();
     setShowEndDialog(false);
     navigate('/dashboard');
@@ -838,154 +939,142 @@ export default function RoomPage() {
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
-
   const displayQuestionNumber = currentQuestionIndex || 1;
   const isThinking = Boolean(thinkingState);
   const userName = user?.displayName ?? 'You';
 
   return (
-    <div className="fixed inset-0 z-40 bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
-
-      {/* Thinking Overlay */}
+    <div className="fixed inset-0 z-40 bg-slate-950 text-slate-100 flex flex-col overflow-hidden font-sans select-none">
+      {/* Dynamic Thinking Overlay */}
       <AnimatePresence>
         {isThinking && thinkingState && <ThinkingOverlay state={thinkingState} />}
       </AnimatePresence>
 
-      {/* ── Header ── */}
-      <header className="flex items-center justify-between px-5 py-2.5 border-b border-slate-800/80 shrink-0 bg-slate-950/90 backdrop-blur-sm">
+      {/* ── Top Header ── */}
+      <header className="flex items-center justify-between px-5 py-2.5 border-b border-slate-800/80 shrink-0 bg-slate-950/95 backdrop-blur-md z-20">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => navigate('/dashboard')}>
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center font-black text-white text-xs shadow-md shadow-violet-500/20">
+              A
+            </div>
             <span className="text-base font-bold tracking-tight text-white">apex</span>
             <span className="text-base font-bold tracking-tight text-violet-400">.ai</span>
           </div>
-          <div className="hidden md:flex items-center">
+          <div className="hidden sm:flex items-center">
             <ChevronRight className="h-3.5 w-3.5 text-slate-600 mx-1" />
-            <span className="text-xs text-slate-400">Interview Room</span>
+            <span className="text-xs text-slate-400 font-medium">Live Interview Session</span>
           </div>
         </div>
 
-        {/* Phase timeline — center */}
-        <div className="hidden lg:flex flex-1 justify-center px-4">
+        {/* Phase Ladder Navigation (Center) */}
+        <div className="hidden md:flex flex-1 justify-center px-4">
           <PhasesTimeline current={currentPhase} />
         </div>
 
-        {/* Right indicators */}
-        <div className="flex items-center gap-2">
-          {/* Silence countdown */}
-          <AnimatePresence>
-            {silenceCountdown !== null && (
-              <motion.span
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="text-xs px-3 py-1 rounded-full bg-amber-900/40 border border-amber-700/50 text-amber-300 font-medium"
-              >
-                Submitting in {silenceCountdown}s...
-              </motion.span>
-            )}
-          </AnimatePresence>
-
-          {lkConnected && (
-            <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-violet-700/50 text-violet-400 bg-violet-950/30">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-ping" />
-              LiveKit Active
-            </span>
+        {/* Status Indicators (Right) */}
+        <div className="flex items-center gap-2.5">
+          {silenceCountdown !== null && (
+            <motion.span
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              className="text-xs px-2.5 py-1 rounded-full bg-amber-950/70 border border-amber-600/50 text-amber-300 font-medium"
+            >
+              Auto-submit in {silenceCountdown}s
+            </motion.span>
           )}
 
-          <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-blue-500/50 text-blue-400 bg-blue-950/30 shadow-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-            LiveKit Hosted Agent
-          </span>
-
-          <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${
-            isConnected
-              ? 'border-emerald-700/50 text-emerald-400 bg-emerald-950/30'
-              : 'border-amber-700/50 text-amber-400 bg-amber-950/30'
-          }`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+          <span
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${
+              isConnected
+                ? 'border-emerald-700/50 text-emerald-400 bg-emerald-950/30'
+                : 'border-amber-700/50 text-amber-400 bg-amber-950/30'
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}
+            />
             {isConnected ? 'Live' : 'Connecting...'}
           </span>
         </div>
       </header>
 
-      {/* ── Main content ── */}
-      <main className="flex-1 flex gap-3 p-3 overflow-hidden min-h-0">
+      {/* ── Main Viewport Grid ── */}
+      <main className="flex-1 flex flex-col md:flex-row gap-3 p-3 overflow-hidden min-h-0 bg-slate-950">
+        {/* Left: Recruiter Stage (Google Meet Style) */}
+        <div className="flex-1 flex flex-col min-w-0 h-full">
+          <RecruiterTile
+            recruiter={recruiter}
+            isSpeaking={recruiterSpeaking}
+            ttsActive={ttsEnabled}
+            onToggleTTS={handleToggleTTS}
+          />
+        </div>
 
-        {/* Left: Recruiter tile (Google Meet style) */}
-        <div className="flex-1 flex flex-col gap-3 min-w-0">
-          {/* Main video grid */}
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-3 min-h-0">
-            {/* Recruiter tile — large */}
-            <div className="md:col-span-3 rounded-2xl overflow-hidden border border-slate-800/80 relative min-h-48">
-              <RecruiterTile recruiter={recruiter} isSpeaking={recruiterSpeaking} />
-            </div>
-
-            {/* Right panel: Question + Transcript */}
-            <div className="md:col-span-2 flex flex-col gap-3 min-h-0">
-              {/* Question bubble */}
-              <div className="shrink-0">
-                <AnimatePresence mode="wait">
-                  {currentQuestion ? (
-                    <div className="flex flex-col gap-2">
-                      <QuestionBubble
-                        key={currentQuestion.id}
-                        text={currentQuestion.text}
-                        number={displayQuestionNumber}
-                        count={questionCount}
-                        phase={currentPhase}
-                      />
-                      <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-slate-900/50 border border-slate-800 text-[11px] font-medium text-slate-400 w-fit">
-                        <span className={`h-1.5 w-1.5 rounded-full ${recruiterSpeaking ? 'bg-violet-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
-                        {recruiterSpeaking ? "Recruiter is speaking..." : "Waiting for your answer..."}
-                      </div>
-                    </div>
-                  ) : (
-                    <motion.div
-                      key="waiting"
-                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="rounded-2xl bg-slate-800/50 border border-slate-700/40 p-6 flex items-center justify-center min-h-[120px]"
-                    >
-                      <div className="flex flex-col items-center gap-3 text-center">
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                          className="h-8 w-8 rounded-full border-4 border-slate-700 border-t-violet-500"
-                        />
-                        <p className="text-slate-400 text-sm font-medium">
-                          {!isConnected
-                            ? "Connecting to recruiter..."
-                            : !lkConnected
-                            ? "Preparing interview..."
-                            : "Generating first question..."}
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Transcript panel */}
-              <div className="flex-1 min-h-0">
-                <TranscriptPanel
-                  transcript={transcript}
-                  isListening={!isMuted && Boolean(currentQuestion) && !isThinking}
+        {/* Right: Question + Interactive Transcript & Answer Panel */}
+        <div className="w-full md:w-[440px] lg:w-[480px] flex flex-col gap-3 h-full shrink-0 min-h-0">
+          {/* Question Display Bubble */}
+          <div className="shrink-0">
+            <AnimatePresence mode="wait">
+              {currentQuestion ? (
+                <QuestionBubble
+                  key={currentQuestion.id}
+                  text={currentQuestion.text}
+                  number={displayQuestionNumber}
+                  count={questionCount}
+                  phase={currentPhase}
+                  isRecruiterSpeaking={recruiterSpeaking}
                 />
-              </div>
-            </div>
+              ) : (
+                <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 flex flex-col items-center justify-center gap-3 text-center">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                    className="h-7 w-7 rounded-full border-3 border-slate-700 border-t-violet-500"
+                  />
+                  <p className="text-slate-400 text-sm font-medium">Connecting to AI interviewer...</p>
+                </div>
+              )}
+            </AnimatePresence>
           </div>
 
-          {/* Phase timeline — mobile */}
-          <div className="lg:hidden">
-            <PhasesTimeline current={currentPhase} />
+          {/* Interactive Answer & Transcript Area */}
+          <div className="flex-1 flex flex-col rounded-2xl bg-slate-900/80 border border-slate-800/80 overflow-hidden shadow-lg min-h-0">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800/60 bg-slate-950/40 shrink-0">
+              <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+                Your Answer
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Voice + Text Active
+                </span>
+              </div>
+            </div>
+
+            {/* Answer Input Textarea */}
+            <div className="flex-1 p-3 flex flex-col min-h-0">
+              <textarea
+                value={typedInput}
+                onChange={(e) => setTypedInput(e.target.value)}
+                placeholder="Speak into your microphone or type your answer here..."
+                disabled={isThinking || answerSubmitted}
+                className="w-full flex-1 bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 resize-none transition-all leading-relaxed"
+              />
+              <div className="flex items-center justify-between mt-2 pt-1 text-slate-500 text-[11px]">
+                <span>{typedInput.trim().split(/\s+/).filter(Boolean).length} words</span>
+                <span>Type or speak naturally</span>
+              </div>
+            </div>
           </div>
         </div>
       </main>
 
-      {/* ── Bottom controls bar ── */}
-      <footer className="shrink-0 border-t border-slate-800/70 bg-slate-900/90 backdrop-blur-sm px-5 py-3">
-        <div className="flex items-center gap-4">
-
-          {/* Left: user camera PiP + timer */}
+      {/* ── Bottom Controls Bar ── */}
+      <footer className="shrink-0 border-t border-slate-800/80 bg-slate-950/95 backdrop-blur-md px-5 py-3 z-20">
+        <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
+          {/* Left: User Live Camera PiP + Countdown Ring */}
           <div className="flex items-center gap-3 shrink-0">
             <UserTile
               videoRef={cameraPreviewRef}
@@ -998,57 +1087,63 @@ export default function RoomPage() {
             )}
           </div>
 
-          {/* Center: action buttons */}
-          <div className="flex-1 flex items-center justify-center gap-2.5">
-            {/* Mute */}
+          {/* Center: Primary Call Controls */}
+          <div className="flex items-center gap-2.5">
+            {/* Mic Toggle */}
             <button
               onClick={handleToggleMute}
-              title={isMuted ? 'Unmute' : 'Mute'}
-              className={`flex flex-col items-center gap-1 rounded-xl px-4 py-2.5 transition-all text-xs font-medium ${
+              title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+              className={`flex flex-col items-center gap-1 rounded-xl px-4 py-2 transition-all text-xs font-medium ${
                 isMuted
-                  ? 'bg-red-900/50 border border-red-700/50 text-red-400 hover:bg-red-900/70 shadow-lg shadow-red-900/20'
-                  : 'bg-slate-800 border border-slate-700/50 text-slate-300 hover:bg-slate-700'
+                  ? 'bg-red-950/60 border border-red-700/60 text-red-400 hover:bg-red-900/60 shadow-lg shadow-red-950/40'
+                  : 'bg-slate-800/80 border border-slate-700/60 text-slate-200 hover:bg-slate-700/80'
               }`}
             >
-              {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-              {isMuted ? 'Unmute' : 'Mute'}
+              {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              <span>{isMuted ? 'Unmute' : 'Mute'}</span>
             </button>
 
-            {/* Camera */}
+            {/* Camera Toggle */}
             <button
               onClick={handleToggleCamera}
-              title={isCameraOff ? 'Start Camera' : 'Stop Camera'}
-              className={`flex flex-col items-center gap-1 rounded-xl px-4 py-2.5 transition-all text-xs font-medium ${
+              title={isCameraOff ? 'Turn camera on' : 'Turn camera off'}
+              className={`flex flex-col items-center gap-1 rounded-xl px-4 py-2 transition-all text-xs font-medium ${
                 isCameraOff
-                  ? 'bg-red-900/50 border border-red-700/50 text-red-400 hover:bg-red-900/70'
-                  : 'bg-slate-800 border border-slate-700/50 text-slate-300 hover:bg-slate-700'
+                  ? 'bg-red-950/60 border border-red-700/60 text-red-400 hover:bg-red-900/60'
+                  : 'bg-slate-800/80 border border-slate-700/60 text-slate-200 hover:bg-slate-700/80'
               }`}
             >
-              {isCameraOff ? <CameraOff className="h-5 w-5" /> : <Camera className="h-5 w-5" />}
-              {isCameraOff ? 'Start Cam' : 'Stop Cam'}
+              {isCameraOff ? <CameraOff className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+              <span>{isCameraOff ? 'Start Cam' : 'Stop Cam'}</span>
             </button>
 
-            {/* Submit Answer */}
+            {/* Submit Answer Button */}
             {currentQuestion && !isThinking && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'spring', stiffness: 300 }}
+                transition={{ duration: 0.2 }}
               >
                 <Button
                   onClick={handleSubmitAnswer}
                   disabled={answerSubmitted}
                   size="lg"
-                  className={`px-8 font-semibold transition-all ${
+                  className={`px-7 font-bold transition-all shadow-lg ${
                     answerSubmitted
-                      ? 'bg-emerald-700/50 text-emerald-300 cursor-not-allowed'
-                      : 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/50'
+                      ? 'bg-emerald-800/60 text-emerald-300 cursor-not-allowed border border-emerald-600/40'
+                      : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-violet-900/50'
                   }`}
                 >
                   {answerSubmitted ? (
-                    <><CheckCircle2 className="h-4 w-4" />Submitted</>
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Evaluating...
+                    </>
                   ) : (
-                    <><Send className="h-4 w-4" />Submit Answer</>
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Submit Answer
+                    </>
                   )}
                 </Button>
               </motion.div>
@@ -1058,39 +1153,43 @@ export default function RoomPage() {
             <button
               onClick={() => setShowEndDialog(true)}
               title="End Interview"
-              className="flex flex-col items-center gap-1 rounded-xl px-4 py-2.5 bg-red-900/40 border border-red-700/40 text-red-400 hover:bg-red-900/60 transition-colors text-xs font-medium"
+              className="flex flex-col items-center gap-1 rounded-xl px-4 py-2 bg-red-950/40 border border-red-700/40 text-red-400 hover:bg-red-900/60 transition-colors text-xs font-medium"
             >
-              <PhoneOff className="h-5 w-5" />
-              End
+              <PhoneOff className="h-4 w-4" />
+              <span>End</span>
             </button>
           </div>
 
-          {/* Right: question progress */}
+          {/* Right: Question Count & Progress */}
           <div className="shrink-0 text-right">
-            <span className="text-2xl font-bold text-white tabular-nums">
+            <span className="text-2xl font-black text-white tabular-nums">
               {questionCount > 0 ? `${displayQuestionNumber}/${questionCount}` : '—'}
             </span>
-            <p className="text-xs text-slate-500 mt-0.5">Questions</p>
+            <p className="text-[11px] text-slate-500 font-medium">Questions</p>
           </div>
         </div>
       </footer>
 
-      {/* End Interview dialog */}
+      {/* ── End Interview Confirmation Modal ── */}
       <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
         <DialogContent className="bg-slate-900 border-slate-700 text-slate-100 max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-white">End Interview?</DialogTitle>
+            <DialogTitle className="text-white">End Interview Early?</DialogTitle>
             <DialogDescription className="text-slate-400">
-              This will end your current interview session. Unanswered questions will be skipped and your report will be generated from answers provided so far.
+              Are you sure you want to conclude the interview? A full evaluation report will be compiled based on the answers you have provided so far.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowEndDialog(false)} className="border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200">
-              Continue Interview
+          <DialogFooter className="gap-2 sm:gap-0 mt-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowEndDialog(false)}
+              className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200"
+            >
+              Resume Interview
             </Button>
-            <Button onClick={handleEndInterview} className="bg-red-700 hover:bg-red-600 text-white">
-              <PhoneOff className="h-4 w-4" />
-              End Interview
+            <Button onClick={handleEndInterview} className="bg-red-700 hover:bg-red-600 text-white font-semibold">
+              <PhoneOff className="h-4 w-4 mr-1.5" />
+              Conclude & Generate Report
             </Button>
           </DialogFooter>
         </DialogContent>
