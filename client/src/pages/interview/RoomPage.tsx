@@ -507,7 +507,6 @@ export default function RoomPage() {
     setThinking,
     setTimer,
     setQuestionCount,
-    incrementQuestionIndex,
     reset: resetStore,
     setTranscript,
     appendTranscript,
@@ -677,9 +676,21 @@ export default function RoomPage() {
 
         utterance.onstart = () => {
           setRecruiterSpeaking(true);
+          try {
+            sttRef.current?.stop();
+          } catch {}
         };
         utterance.onend = () => {
           setRecruiterSpeaking(false);
+          try {
+            if (!isMuted && currentQuestion) {
+              setTimeout(() => {
+                try {
+                  sttRef.current?.start();
+                } catch {}
+              }, 400);
+            }
+          } catch {}
           if (keepAliveIntervalRef.current) {
             clearInterval(keepAliveIntervalRef.current);
             keepAliveIntervalRef.current = null;
@@ -688,6 +699,15 @@ export default function RoomPage() {
         utterance.onerror = (e) => {
           console.warn('SpeechSynthesis error:', e);
           setRecruiterSpeaking(false);
+          try {
+            if (!isMuted && currentQuestion) {
+              setTimeout(() => {
+                try {
+                  sttRef.current?.start();
+                } catch {}
+              }, 400);
+            }
+          } catch {}
           if (keepAliveIntervalRef.current) {
             clearInterval(keepAliveIntervalRef.current);
             keepAliveIntervalRef.current = null;
@@ -718,7 +738,7 @@ export default function RoomPage() {
         console.warn('speakQuestion failed:', err);
       }
     },
-    [ttsEnabled, getBestVoice]
+    [ttsEnabled, getBestVoice, isMuted, currentQuestion]
   );
 
   // ---------------------------------------------------------------------------
@@ -736,6 +756,9 @@ export default function RoomPage() {
       sttRef.current = recognition;
 
       recognition.onresult = (event: any) => {
+        // If AI interviewer is currently speaking out loud, ignore mic audio so it doesn't transcribe AI's own voice
+        if (recruiterSpeaking) return;
+
         let finalChunk = '';
         let interimChunk = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -759,25 +782,11 @@ export default function RoomPage() {
         // Reset silence countdown when speaking
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         setSilenceCountdown(null);
-
-        // 4-second silence detection
-        silenceTimerRef.current = setTimeout(() => {
-          setSilenceCountdown(4);
-          const interval = setInterval(() => {
-            setSilenceCountdown((prev) => {
-              if (prev === null || prev <= 1) {
-                clearInterval(interval);
-                return null;
-              }
-              return prev - 1;
-            });
-          }, 1000);
-        }, 4000);
       };
 
       recognition.onerror = () => {};
       recognition.onend = () => {
-        if (!isMuted && currentQuestion && sttRef.current) {
+        if (!isMuted && currentQuestion && !recruiterSpeaking && sttRef.current) {
           try {
             recognition.start();
           } catch {}
@@ -786,7 +795,7 @@ export default function RoomPage() {
 
       recognition.start();
     } catch {}
-  }, [appendTranscript, isMuted, currentQuestion]);
+  }, [appendTranscript, isMuted, currentQuestion, recruiterSpeaking]);
 
   const stopSTT = useCallback(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -799,27 +808,38 @@ export default function RoomPage() {
 
   // Manage STT lifecycle
   useEffect(() => {
-    if (currentQuestion && !isMuted) {
+    if (currentQuestion && !isMuted && !recruiterSpeaking) {
       stopSTT();
       startSTT();
     } else {
       stopSTT();
     }
     return stopSTT;
-  }, [currentQuestion?.id, isMuted, startSTT, stopSTT]);
+  }, [currentQuestion?.id, isMuted, recruiterSpeaking, startSTT, stopSTT]);
 
   // ---------------------------------------------------------------------------
   // Answer Submission
   // ---------------------------------------------------------------------------
   const handleSubmitAnswer = useCallback(() => {
     if (!currentQuestion || answerSubmitted) return;
+
+    const rawAnswer = typedInput.trim() || transcript.trim() || interimTranscript.trim();
+    if (!rawAnswer) {
+      toast({
+        title: 'Please provide an answer',
+        description: 'Speak into your microphone or type your response before submitting.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     stopTimer();
     stopSTT();
     window.speechSynthesis?.cancel();
     setRecruiterSpeaking(false);
     setAnswerSubmitted(true);
 
-    const finalAnswer = typedInput.trim() || transcript.trim() || 'Candidate provided verbal answer';
+    const finalAnswer = rawAnswer;
     const durationSeconds = Math.max(1, Math.round((Date.now() - answerStartTime) / 1000));
 
     if (socketRef.current?.connected) {
@@ -842,18 +862,29 @@ export default function RoomPage() {
     stopSTT,
     typedInput,
     transcript,
+    interimTranscript,
     answerStartTime,
     sessionId,
     setTranscript,
     setThinking,
   ]);
 
-  // Auto-submit when circular timer hits 0
+  // Auto-submit when circular timer hits 0 ONLY IF the candidate has actually answered
   useEffect(() => {
     if (timer === 0 && currentQuestion && !answerSubmitted) {
-      handleSubmitAnswer();
+      const hasAnswer = (typedInput.trim() || transcript.trim() || interimTranscript.trim()).length > 0;
+      if (hasAnswer) {
+        handleSubmitAnswer();
+      } else {
+        // Extend time by 60s so candidate isn't unfairly skipped with empty answer
+        setTimer(60);
+        toast({
+          title: 'Time Extended (+60s)',
+          description: 'Please speak into your microphone or type your response to proceed.',
+        });
+      }
     }
-  }, [timer, currentQuestion, answerSubmitted, handleSubmitAnswer]);
+  }, [timer, currentQuestion, answerSubmitted, typedInput, transcript, interimTranscript, handleSubmitAnswer, setTimer]);
 
   // ---------------------------------------------------------------------------
   // Socket.io Setup
@@ -922,7 +953,7 @@ export default function RoomPage() {
       setThinking(null);
       setQuestion(qObj);
       setAnswerSubmitted(false);
-      incrementQuestionIndex();
+      useInterviewStore.setState({ currentQuestionIndex: (q.orderIndex ?? 0) + 1 });
       startTimer(qObj.timeLimit);
 
       if (q.currentPhase) {
@@ -975,7 +1006,6 @@ export default function RoomPage() {
     setQuestion,
     setThinking,
     setQuestionCount,
-    incrementQuestionIndex,
     startTimer,
     stopTimer,
     stopSTT,
@@ -994,7 +1024,7 @@ export default function RoomPage() {
     }
   }, [thinkingState, setThinking]);
 
-  // Fallback initial question if socket doesn't push within 3 seconds
+  // Fallback initial question if socket doesn't push within 20 seconds (safety only)
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!currentQuestion) {
@@ -1008,10 +1038,11 @@ export default function RoomPage() {
         setThinking(null);
         setQuestion(fallback);
         setQuestionCount(5);
+        useInterviewStore.setState({ currentQuestionIndex: 1 });
         startTimer(120);
         speakQuestion(fallback.text);
       }
-    }, 3500);
+    }, 20000);
 
     return () => clearTimeout(timeout);
   }, [currentQuestion, setQuestion, setQuestionCount, startTimer, speakQuestion, setThinking]);

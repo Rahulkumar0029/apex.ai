@@ -131,7 +131,7 @@ export function registerInterviewHandlers(
         text:         dbQuestion.text,
         audioUrl:     '',
         orderIndex:   0,
-        timeLimit:    phase === 'Introduction' ? 30 : 120,
+        timeLimit:    120,
         currentPhase: phase,
       });
 
