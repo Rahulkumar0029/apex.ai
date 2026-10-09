@@ -28,6 +28,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/authStore';
 import { useInterviewStore } from '@/store/interviewStore';
+import interviewService from '@/services/interviewService';
 
 // ---------------------------------------------------------------------------
 // Constants & Configuration
@@ -429,12 +430,14 @@ function QuestionBubble({
   count,
   phase,
   isRecruiterSpeaking,
+  onReplayVoice,
 }: {
   text: string;
   number: number;
   count: number;
   phase: Phase | null;
   isRecruiterSpeaking: boolean;
+  onReplayVoice?: () => void;
 }) {
   return (
     <motion.div
@@ -456,11 +459,23 @@ function QuestionBubble({
             Question {number} of {count}
           </span>
         </div>
-        <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
-          <span
-            className={`h-2 w-2 rounded-full ${isRecruiterSpeaking ? 'bg-violet-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`}
-          />
-          {isRecruiterSpeaking ? 'Interviewer Speaking' : 'Your Turn to Answer'}
+        <div className="flex items-center gap-2">
+          {onReplayVoice && (
+            <button
+              onClick={onReplayVoice}
+              className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-950/80 hover:bg-violet-900 text-violet-200 border border-violet-700/60 transition-all shadow cursor-pointer active:scale-95"
+              title="Click to hear AI interviewer speak"
+            >
+              <Volume2 className={`h-3.5 w-3.5 ${isRecruiterSpeaking ? 'text-violet-300 animate-pulse' : 'text-slate-300'}`} />
+              <span>{isRecruiterSpeaking ? 'Speaking...' : '🔊 Listen'}</span>
+            </button>
+          )}
+          <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
+            <span
+              className={`h-2 w-2 rounded-full ${isRecruiterSpeaking ? 'bg-violet-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`}
+            />
+            <span className="hidden sm:inline">{isRecruiterSpeaking ? 'Interviewer Speaking' : 'Your Turn'}</span>
+          </div>
         </div>
       </div>
       <p className="text-base md:text-lg font-medium text-slate-100 leading-relaxed">{text}</p>
@@ -517,7 +532,24 @@ export default function RoomPage() {
   const [recruiterSpeaking, setRecruiterSpeaking] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [typedInput, setTypedInput] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState('');
   const [silenceCountdown, setSilenceCountdown] = useState<number | null>(null);
+  const [sessionInfo, setSessionInfo] = useState<{ role: string; experienceYears: number; difficulty: string } | null>(null);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    interviewService.getSession(sessionId)
+      .then((data) => {
+        if (data) {
+          setSessionInfo({
+            role: data.role,
+            experienceYears: data.experienceYears,
+            difficulty: data.difficulty,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [sessionId]);
 
   // Refs
   const socketRef = useRef<Socket | null>(null);
@@ -527,6 +559,46 @@ export default function RoomPage() {
   const timerMaxRef = useRef<number>(120);
   const sttRef = useRef<any>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const keepAliveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Load and listen to speech synthesis voices
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return;
+    const loadVoices = () => {
+      window.speechSynthesis.getVoices();
+    };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    const unlockAudio = () => {
+      try {
+        window.speechSynthesis.resume();
+      } catch {}
+    };
+    window.addEventListener('click', unlockAudio, { once: true });
+    window.addEventListener('keydown', unlockAudio, { once: true });
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+      if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
+    };
+  }, []);
+
+  const getBestVoice = useCallback((): SpeechSynthesisVoice | undefined => {
+    if (!('speechSynthesis' in window)) return undefined;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return undefined;
+
+    return (
+      voices.find((v) => v.lang.startsWith('en') && (v.name.includes('Zira') || v.name.includes('Samantha') || v.name.includes('Jenny') || v.name.toLowerCase().includes('female') || v.name.includes('Natural'))) ||
+      voices.find((v) => v.lang.startsWith('en-US')) ||
+      voices.find((v) => v.lang.startsWith('en')) ||
+      voices[0]
+    );
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Camera & Mic Permissions
@@ -584,27 +656,69 @@ export default function RoomPage() {
   const speakQuestion = useCallback(
     (text: string) => {
       if (!ttsEnabled || !('speechSynthesis' in window)) return;
-      window.speechSynthesis.cancel();
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
+      try {
+        if (keepAliveIntervalRef.current) {
+          clearInterval(keepAliveIntervalRef.current);
+          keepAliveIntervalRef.current = null;
+        }
 
-      // Select preferred English voice
-      const voices = window.speechSynthesis.getVoices();
-      const preferred =
-        voices.find((v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('female')) ||
-        voices.find((v) => v.lang.startsWith('en-US')) ||
-        voices[0];
-      if (preferred) utterance.voice = preferred;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.resume();
 
-      utterance.onstart = () => setRecruiterSpeaking(true);
-      utterance.onend = () => setRecruiterSpeaking(false);
-      utterance.onerror = () => setRecruiterSpeaking(false);
+        const clean = text.replace(/[*_#`]/g, '').trim();
+        const utterance = new SpeechSynthesisUtterance(clean);
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
 
-      window.speechSynthesis.speak(utterance);
+        const voice = getBestVoice();
+        if (voice) utterance.voice = voice;
+
+        utterance.onstart = () => {
+          setRecruiterSpeaking(true);
+        };
+        utterance.onend = () => {
+          setRecruiterSpeaking(false);
+          if (keepAliveIntervalRef.current) {
+            clearInterval(keepAliveIntervalRef.current);
+            keepAliveIntervalRef.current = null;
+          }
+        };
+        utterance.onerror = (e) => {
+          console.warn('SpeechSynthesis error:', e);
+          setRecruiterSpeaking(false);
+          if (keepAliveIntervalRef.current) {
+            clearInterval(keepAliveIntervalRef.current);
+            keepAliveIntervalRef.current = null;
+          }
+        };
+
+        utteranceRef.current = utterance;
+        (window as any).__apexUtterance = utterance;
+
+        keepAliveIntervalRef.current = setInterval(() => {
+          if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.resume();
+          } else if (keepAliveIntervalRef.current) {
+            clearInterval(keepAliveIntervalRef.current);
+            keepAliveIntervalRef.current = null;
+          }
+        }, 5000);
+
+        setTimeout(() => {
+          try {
+            window.speechSynthesis.resume();
+            window.speechSynthesis.speak(utterance);
+          } catch (e) {
+            console.warn('speak invocation failed:', e);
+          }
+        }, 60);
+      } catch (err) {
+        console.warn('speakQuestion failed:', err);
+      }
     },
-    [ttsEnabled]
+    [ttsEnabled, getBestVoice]
   );
 
   // ---------------------------------------------------------------------------
@@ -623,14 +737,23 @@ export default function RoomPage() {
 
       recognition.onresult = (event: any) => {
         let finalChunk = '';
+        let interimChunk = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
             finalChunk += event.results[i][0].transcript;
+          } else {
+            interimChunk += event.results[i][0].transcript;
           }
         }
+
+        if (interimChunk) {
+          setInterimTranscript(interimChunk);
+        }
+
         if (finalChunk) {
+          setInterimTranscript('');
           appendTranscript(finalChunk + ' ');
-          setTypedInput((prev) => (prev ? prev + ' ' + finalChunk : finalChunk));
+          setTypedInput((prev) => (prev ? prev.trim() + ' ' + finalChunk.trim() : finalChunk.trim()));
         }
 
         // Reset silence countdown when speaking
@@ -710,6 +833,7 @@ export default function RoomPage() {
 
     setTranscript('');
     setTypedInput('');
+    setInterimTranscript('');
     setThinking('analyzing');
   }, [
     currentQuestion,
@@ -967,7 +1091,16 @@ export default function RoomPage() {
         </div>
 
         {/* Phase Ladder Navigation (Center) */}
-        <div className="hidden md:flex flex-1 justify-center px-4">
+        <div className="hidden md:flex flex-1 justify-center px-4 items-center gap-3">
+          {sessionInfo && (
+            <div className="hidden xl:flex items-center gap-2 bg-slate-900/90 border border-violet-500/30 px-3 py-1 rounded-full text-xs shrink-0 shadow-sm">
+              <span className="text-violet-300 font-semibold">{sessionInfo.role}</span>
+              <span className="text-slate-600">·</span>
+              <span className="text-slate-300">{sessionInfo.experienceYears} YOE</span>
+              <span className="text-slate-600">·</span>
+              <span className="text-slate-400">{sessionInfo.difficulty}</span>
+            </div>
+          )}
           <PhasesTimeline current={currentPhase} />
         </div>
 
@@ -1024,6 +1157,7 @@ export default function RoomPage() {
                   count={questionCount}
                   phase={currentPhase}
                   isRecruiterSpeaking={recruiterSpeaking}
+                  onReplayVoice={() => currentQuestion?.text && speakQuestion(currentQuestion.text)}
                 />
               ) : (
                 <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 flex flex-col items-center justify-center gap-3 text-center">
@@ -1055,6 +1189,13 @@ export default function RoomPage() {
 
             {/* Answer Input Textarea */}
             <div className="flex-1 p-3 flex flex-col min-h-0">
+              {interimTranscript && (
+                <div className="flex items-center gap-2 text-xs text-violet-300 bg-violet-950/70 border border-violet-700/60 px-3 py-1.5 rounded-lg mb-2 shadow-sm animate-pulse">
+                  <span className="h-2 w-2 rounded-full bg-violet-400 animate-ping shrink-0" />
+                  <span className="font-semibold text-violet-300 shrink-0">Live Voice:</span>
+                  <span className="italic text-slate-100 truncate">"{interimTranscript}"</span>
+                </div>
+              )}
               <textarea
                 value={typedInput}
                 onChange={(e) => setTypedInput(e.target.value)}

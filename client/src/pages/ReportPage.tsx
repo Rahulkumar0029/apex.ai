@@ -353,18 +353,18 @@ export default function ReportPage() {
   if (!report) return null
 
   const radarData = [
-    { subject: 'Technical', value: report.technicalScore },
+    { subject: 'Technical Knowledge', value: report.technicalScore },
     { subject: 'Communication', value: report.communicationScore },
     { subject: 'Confidence', value: report.confidenceScore },
-    { subject: 'Grammar', value: report.grammarScore },
+    { subject: 'Fluency & Grammar', value: report.grammarScore },
     { subject: 'Problem Solving', value: report.problemSolvingScore },
   ]
 
   const scoreBreakdown = [
-    { label: 'Technical', score: report.technicalScore },
+    { label: 'Technical Knowledge', score: report.technicalScore },
     { label: 'Communication', score: report.communicationScore },
     { label: 'Confidence', score: report.confidenceScore },
-    { label: 'Grammar & Fluency', score: report.grammarScore },
+    { label: 'Fluency & Grammar', score: report.grammarScore },
     { label: 'Problem Solving', score: report.problemSolvingScore },
   ]
 
